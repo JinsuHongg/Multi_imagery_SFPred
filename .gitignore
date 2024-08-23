@@ -1,3 +1,7 @@
+# results files or results directories
+Results/
+*.csv 
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
