@@ -35,21 +35,3 @@ while dt <= stop_date:
 
 df = pd.DataFrame(total_result, columns = ['Timestamp', 'EUV304', 'HMI_Mag', 'HMI_CTnuum'])
 df.to_csv("Missing_info.csv", index = False)
-
-# while dt < stop_date:
-        
-#         # Define Timestamp
-#         filename = str(dt.year) + '.' +  f'{dt.month:02d}' + '.' + f'{dt.day:02d}' + '_'\
-#             + f'{dt.hour:02d}' + '.' + f'{dt.minute:02d}' + '.' + f'{dt.second:02d}'
-        
-#         file_exit = "/worksapce/data/hetero/**/**/{dt.year}/{dt.month:02d}/{dt.day:02d}/*." + \
-#                     "{dt.year}.{dt.month:02d}.{dt.day:02d}_{dt.hour:02d}.{dt.minute:02d}.{dt:second:02d}.jp2"
-
-        
-#         # Path(f'{basedir}/{dt.year}/{dt.month:02d}/{dt.day:02d}').mkdir(parents=True, exist_ok=True)
-#         #Defining name of downloaded images based on the date and time
-        
-
-
-#         hours = datetime.timedelta(minutes = cadence)
-#         dt = dt+ hours

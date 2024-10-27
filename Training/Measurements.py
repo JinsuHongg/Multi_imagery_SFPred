@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import f1_score
 
 
 def TSS(table):
@@ -126,7 +127,5 @@ def TSS_multiclass(table):
     obs_sqr = (table.sum(axis=1)**2).sum() / (N**2)
     
     return (TP_sum-Forcast_times_obs)/(1-obs_sqr)
-
-
 
 

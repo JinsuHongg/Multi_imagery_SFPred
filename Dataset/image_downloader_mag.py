@@ -22,7 +22,7 @@ def download_from_helioviewer(basedir:str = '/data/hmi_compressd', cadence:int =
 
     """
 
-    start_date = '2010-12-05 00:00:00'
+    start_date = '2016-09-25 00:00:00'
     stop_date = datetime.datetime.now()
     #File counter
     counter = 0
@@ -112,10 +112,10 @@ def jp2_to_jpg_conversion(source = '/data/hmi_compressd/', destination = '/data/
             pass
 
 if __name__ == '__main__':
-    prefix = 'EUV-304'
-    save_dir = '/workspace/data/hetero_data/euv/304'
+    prefix = 'HMI-Mag'
+    save_dir = '/workspace/data/hetero_data/hmi/mag'
     # download_from_helioviewer(basedir = save_dir, cadence = 60, source = 13, file_prefix = prefix)
     jp2_to_jpg_conversion(source = save_dir + '/',
                           file_prefix = prefix, 
-                          destination = '/workspace/data/hetero_data/euv/compressed/304/', 
+                          destination = '/workspace/data/hetero_data/hmi/compressed/mag/', 
                           resize = True, width = 512, height = 512)

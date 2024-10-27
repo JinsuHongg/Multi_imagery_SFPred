@@ -9,7 +9,7 @@ def train_loop(dataloader, model, loss_fn, optimizer=None, lr_scheduler=None):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
 
-    pred_arr = np.empty((0,2), float)
+    pred_arr = np.empty((0,2), int)
     train_loss = 0
     for batch, (X, y) in enumerate(dataloader):
         
@@ -20,24 +20,23 @@ def train_loop(dataloader, model, loss_fn, optimizer=None, lr_scheduler=None):
 
         # predictions and true labels 
         pred_arr = np.append(pred_arr, np.concatenate( (predictions.unsqueeze(1).cpu().detach().numpy(), y.unsqueeze(1).cpu().detach().numpy()), axis=1), axis=0)
-
-        # loss
-        loss = loss_fn(pred, y) #.float()
         
+        # loss
+        # loss = loss_fn(pred, y)#.float()
+        loss = loss_fn(pred, y) # log_softmax after NLLloss! torch.nn.functional.log_softmax(pred, dim=1)
+
         # Backpropagation
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
-
+        lr_scheduler.step()
+        
         # if batch % 100 == 0:
         #     loss, current = loss.item(), (batch + 1) * len(X)
         #     print(f"loss: {loss:.4f}  [{current:>5d}/{size:>5d}]")
 
         train_loss += loss
     
-    # learning scheduler
-    lr_scheduler.step(loss)
-
     # check loss
     train_loss /= num_batches
     # print(f'Training Avg loss: {train_loss:.4f}')
@@ -59,8 +58,8 @@ def test_loop(dataloader, model, loss_fn):
             X, y = X.cuda(), y.cuda()
             pred = model(X)
             _, predictions = torch.max(pred, 1)
-
-            test_loss += loss_fn(pred, y).item()
+            
+            test_loss += loss_fn(pred, y).item() #torch.nn.functional.log_softmax(pred, dim=1)
             pred_arr = np.append(pred_arr, np.concatenate( (predictions.unsqueeze(1).cpu().detach().numpy(), y.unsqueeze(1).cpu().detach().numpy()), axis=1), axis=0)
 
     test_loss /= num_batches
