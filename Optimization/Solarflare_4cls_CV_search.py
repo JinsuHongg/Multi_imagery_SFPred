@@ -93,6 +93,7 @@ print(f'Hyper parameters: batch_size: {batch_size}, number of epoch: {num_epoch}
 
 # Cross-validatation with optimization ( total = 4folds X Learning rate sets X weight decay sets )
 for wt in decay_val:
+    training_result = []
     for i in range(0, 4):
         
         '''
@@ -141,7 +142,6 @@ for wt in decay_val:
         test_dataloader = DataLoader(data_testing, batch_size = batch_size, shuffle = False) # num_workers = 0, pin_memory = True,    
 
         # create result list and array 
-        training_result = []
         lable_train_arr = np.empty((0,2), float)
         lable_test_arr = np.empty((0,2), float) 
 
