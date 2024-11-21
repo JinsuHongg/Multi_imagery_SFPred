@@ -1,6 +1,7 @@
 # basic package
 import math
 import time
+import datetime
 import argparse
 import numpy as np
 import pandas as pd
@@ -15,8 +16,8 @@ from torch.utils.data import DataLoader, ConcatDataset
 #from pytorch_forecasting.metrics import QuantileLoss
 
 # predefined class
-from ..Models import mobilenet, ResNet34, ResNet50
-from ..Training import SolarFlSets, HSS2, TSS, F1Pos, HSS_multiclass, TSS_multiclass, train_loop, test_loop, oversample_func
+from .Models import mobilenet, ResNet18, ResNet34, ResNet50
+from .Training import SolarFlSets, HSS2, TSS, F1Pos, HSS_multiclass, TSS_multiclass, train_loop, test_loop, oversample_func
 
 # CUDA for PyTorch
 use_cuda = torch.cuda.is_available()
@@ -38,7 +39,8 @@ parser.add_argument("--batch_size", type = int, default = 64, help = "batch size
 parser.add_argument("--lr", type = float, default = 1e-6, help = "learning rate")
 parser.add_argument("--weight_decay", type = list, default = [0, 1e-4], help = "regularization parameter")
 parser.add_argument("--max_lr", type = float, default = 1e-2, help = "MAX learning rate")
-parser.add_argument("--models", type = str, default = 'Mobilenet', help = "Enter Mobilenet, Resnet34, Resnet50")
+parser.add_argument("--models", type = str, default = 'Mobilenet', help = "Enter Mobilenet, Resnet18, Resnet34, Resnet50")
+parser.add_argument("--freeze", type = bool, default = False, help = 'Enter True or False to freeze the convolutional layers')
 parser.add_argument("--data", type = str, default = 'EUV304', help = "Enter Data source: EUV304, HMI-CTnuum, HMI-Mag, All")
 opt = parser.parse_args()
 
@@ -141,24 +143,24 @@ for wt in decay_val:
         train_dataloader = DataLoader(data_training, batch_size = batch_size, shuffle = True) # num_workers = 0, pin_memory = True, 
         test_dataloader = DataLoader(data_testing, batch_size = batch_size, shuffle = False) # num_workers = 0, pin_memory = True,    
 
-        # create result list and array 
-        lable_train_arr = np.empty((0,2), float)
-        lable_test_arr = np.empty((0,2), float) 
-
         # define model, loss, optimizer and scheduler
         # model = mobilenet().to(device)
 
         # define model here
         if opt.models=="Mobilenet":
-            net = mobilenet().to(device)
+            net = mobilenet(freeze = opt.freeze).to(device)
+            print("Model Selected: ", opt.models)
+            # print(net)
+        elif opt.models=="Resnet18":
+            net = ResNet18(freeze = opt.freeze).to(device)
             print("Model Selected: ", opt.models)
             # print(net)
         elif opt.models=="Resnet34":
-            net = ResNet34().to(device)
+            net = ResNet34(freeze = opt.freeze).to(device)
             print("Model Selected: ", opt.models)
             # print(net)
         elif opt.models=="Resnet50":
-            net = ResNet50().to(device)
+            net = ResNet50(freeze = opt.freeze).to(device)
             print("Model Selected: ", opt.models)
             # print(net)
         else:
@@ -208,7 +210,7 @@ for wt in decay_val:
                 best_epoch = t+1
                 best_loss = test_loss
 
-                PATH = save_path + f"regmodel/{model_name}_{channel_tag}_20102024_train{p[0]}{p[1]}{p[2]}_test{test_p}.pth"
+                PATH = save_path + f"regmodel/{model_name}_{channel_tag}_freeze{opt.freeze}_20102024_train{p[0]}{p[1]}{p[2]}_test{test_p}.pth"
             # save model
                 torch.save({
                         'epoch': t,
@@ -221,7 +223,7 @@ for wt in decay_val:
                         }, PATH)
                 
                 # save prediction array
-                log_path = save_path + 'log/' + f'{model_name}_{channel_tag}_20102024_train{p[0]}{p[1]}{p[2]}_test{test_p}_' + \
+                log_path = save_path + 'log/' + f'{model_name}_{channel_tag}_freeze{opt.freeze}_20102024_train{p[0]}{p[1]}{p[2]}_test{test_p}_' + \
                     f'lr{-math.log10(actual_lr):.1f}_decayval'
                 
                 if wt != 0:
@@ -232,15 +234,15 @@ for wt in decay_val:
                     train_log = np.save(f, train_result)
                     test_log = np.save(f, test_result)
 
-    training_result.append([f'Hyper parameters: train: {p}, test: {test_p}, batch_size: {batch_size}, number of epoch: {num_epoch}, initial learning rate: {lr}, decay value: {wt}'])
+    training_result.append([f'Hyper parameters: batch_size: {batch_size}, number of epoch: {num_epoch}, initial learning rate: {lr}, decay value: {wt}'])
 
     # save the results
     #print("Saving the model's result")
     df_result = pd.DataFrame(training_result, columns=['Epoch', 'Train_p', 'Test_p', 
                                                         'learning rate', 'weight decay', 'Train_loss', 'Test_loss',
                                                         'HSS', 'TSS', 'F1_macro', 'Training-testing time(min)'])
-    
-    total_save_path = save_path + f'{model_name}_{channel_tag}_20102024_result_CV_lr{-math.log10(lr):.1f}_wt'
+    date = datetime.datetime.now()
+    total_save_path = save_path + f'{model_name}_{channel_tag}_freeze{opt.freeze}_{date.year}{date.month:02d}_result_CV_lr{-math.log10(lr):.1f}_wt'
     if wt != 0:
         total_save_path += f'{-math.log10(wt):.1f}.csv'
     else:

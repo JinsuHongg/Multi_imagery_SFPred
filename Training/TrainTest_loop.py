@@ -9,7 +9,7 @@ def train_loop(dataloader, model, loss_fn, optimizer=None, lr_scheduler=None):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
 
-    pred_arr = np.empty((0,2), int)
+    pred_arr = np.empty((0, 2), int)
     train_loss = 0
     for batch, (X, y) in enumerate(dataloader):
         
@@ -50,7 +50,7 @@ def test_loop(dataloader, model, loss_fn):
     num_batches = len(dataloader)
     
     test_loss = 0
-    pred_arr = np.empty((0,2), float)
+    pred_arr = np.empty((0, 2), float)
     # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
     # also serves to reduce unnecessary gradient computations and memory usage for tensors with requires_grad=True
     with torch.no_grad():
@@ -58,9 +58,32 @@ def test_loop(dataloader, model, loss_fn):
             X, y = X.cuda(), y.cuda()
             pred = model(X)
             _, predictions = torch.max(pred, 1)
-            
             test_loss += loss_fn(pred, y).item() #torch.nn.functional.log_softmax(pred, dim=1)
             pred_arr = np.append(pred_arr, np.concatenate( (predictions.unsqueeze(1).cpu().detach().numpy(), y.unsqueeze(1).cpu().detach().numpy()), axis=1), axis=0)
+
+    test_loss /= num_batches
+
+    # print(f"Test loss: {test_loss:.4f}")
+    return test_loss, pred_arr
+
+def test_loop_cp(dataloader, model, loss_fn, score_fn):
+    # Set the model to evaluation mode - important for batch normalization and dropout layers
+    # Unnecessary in this situation but added for best practices
+    model.eval()
+    num_batches = len(dataloader)
+    
+    test_loss = 0
+    pred_arr = np.empty((0,5), float)
+    # Evaluating the model with torch.no_grad() ensures that no gradients are computed during test mode
+    # also serves to reduce unnecessary gradient computations and memory usage for tensors with requires_grad=True
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.cuda(), y.cuda()
+            pred = model(X)
+            _, predictions = torch.max(pred, 1)
+            output = score_fn(pred)
+            test_loss += loss_fn(pred, y).item() #torch.nn.functional.log_softmax(pred, dim=1)
+            pred_arr = np.append(pred_arr, np.concatenate( (output.cpu().detach().numpy(), y.unsqueeze(1).cpu().detach().numpy()), axis=1), axis=0)
 
     test_loss /= num_batches
 

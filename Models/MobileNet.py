@@ -4,7 +4,7 @@ import torch.nn as nn
 # import torchvision.models as models
 
 class mobilenet(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, freeze = False) -> None:
         super(mobilenet, self).__init__()
 
         # Load mobilenet v3
@@ -12,6 +12,13 @@ class mobilenet(nn.Module):
         self.model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v3_large', pretrained=True)
         self.model.classifier[-1] = nn.Linear(1280, 4)
 
+        if freeze:
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+            #unfreeze only last fully connected layers.
+            for param in self.model.classifier.parameters():
+                param.requires_grad = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.model(x)
