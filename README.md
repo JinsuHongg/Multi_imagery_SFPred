@@ -1,5 +1,14 @@
-Command Example,   
-python -m Multi_imagery_SFPred.Optimization.Solarflare_4cls_CV_search --models Mobilenet --data All  
+Command Example,
+
+For cross validation with four partitions (tri-month partitioning)  
+python -m Multi_imagery_SFPred.Main_CV --models Mobilenet --data All  
+
+For validation, partition 1 & 2: training, parition 3: calibration, partition 4: testing  
+python -m Multi_imagery_SFPred.cp_training --models Mobilenet --data All  
+
+For calibration on partition 3,  
+python -m Multi_imagery_SFPred.cp_cal --models Mobilenet --data All
+
 
 ### [Arguments]   
 "--epochs": type = int, default = 4  

@@ -1,12 +1,18 @@
+import glob
 import requests
 import datetime
 from pathlib import Path
-import pandas as pd
-import numpy as np
-import os, csv
-import cv2
+from concurrent.futures import ThreadPoolExecutor
 
-def download_from_helioviewer(basedir:str = '/data/hmi_compressd', cadence:int = 360, source:int = 13, file_prefix:str = 'AIA304'):
+def download_from_helioviewer(
+        basedir:str = '/data/hmi_compressd', 
+        start:str = '2010-12-05 00:00:00', 
+        stop:str = "2024-12-31 12:59:59", 
+        cadence:int = 360, 
+        source:int = 13, 
+        search_space:int = 10,
+        file_prefix:str = 'AIA304'
+        ):
     """
     1)
     This functions download 4k magnetogram jp2s from helioviewer api (https://api.helioviewer.org/v2/getJP2Image/) at a cadence of 12mins as available.
@@ -22,56 +28,68 @@ def download_from_helioviewer(basedir:str = '/data/hmi_compressd', cadence:int =
 
     """
 
-    start_date = '2010-12-05 00:00:00'
-    stop_date = datetime.datetime.now()
     #File counter
     counter = 0
 
     #Start Date
-    dt = datetime.datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+    dt = datetime.datetime.strptime(start, "%Y-%m-%d %H:%M:%S")
+    end = datetime.datetime.strptime(stop, "%Y-%m-%d %H:%M:%S")
+    delta = datetime.timedelta(minutes = cadence)
+
     lis = []
-    while True:
-        hours = datetime.timedelta(minutes = cadence)
-        dt = dt+ hours
+    while dt <= end:
+        
         final_date = str(dt.date()) + 'T' + str(dt.time()) + 'Z'
-        if dt >= stop_date:
-            break
         Path(f'{basedir}/{dt.year}/{dt.month:02d}/{dt.day:02d}').mkdir(parents=True, exist_ok=True)
         #Defining name of downloaded images based on the date and time
-        filename = file_prefix + '.' + str(dt.year) + '.' +  f'{dt.month:02d}' + '.' + f'{dt.day:02d}' + '_'\
-            + f'{dt.hour:02d}' + '.' + f'{dt.minute:02d}' + '.' + f'{dt.second:02d}' + '.jp2'
+        filename = f"{file_prefix}.{dt.year}.{dt:%m.%d_%H.%M.%S}.jp2"
         file_loc_with_name = f'{basedir}/{dt.year}/{dt.month:02d}/{dt.day:02d}/' + filename
 
-        #Using jpip=True gives the uri of the image which we use to parse time_stamp of available image
-        #Detail documentation is provided on api.helioviewer.org
-        # requestString = "https://api.helioviewer.org/ss/getJP2Image/?date=" + final_date + f"&sourceId={source}&jpip=true"
-        requestString = "https://api.helioviewer.org/v2/getJP2Image/?date=" + final_date + f"&sourceId={source}&jpip=true"
-        #print(requestString, '-->Requested')
+        # check if the file already exists
+        if os.path.exists(file_loc_with_name):
+            print(filename, "File already exists. Passed!")
+            dt = dt+ delta
+            continue
 
-        #Parsing date from the recived uri
-        response = requests.get(requestString)
-        url = str(response.content)
+        base_url = "https://api.helioviewer.org/v2/getJP2Image/"
+        params = {
+            "date": final_date,
+            "sourceId": source,
+            "jpip": True
+        }
+
+        # First request: Get JP2 URI (used to extract timestamp)
+        response = requests.get(base_url, params=params)
+        url = response.content.decode()  # decode instead of str() for clarity
         url_temp = url.rsplit('/', 1)[-1]
-        date_recieved = url_temp.rsplit('__', 1)[0][:-4]
-        recieved = datetime.datetime.strptime(date_recieved, "%Y_%m_%d__%H_%M_%S")
-        print(f'Requested date: {dt}', f'Response data: {recieved}')
-        
-        #Now comparing the timestamp of available image and requested image
-        #Download only if within the window of 12 minutes.
-        if abs(recieved-dt) <= (datetime.timedelta(minutes = 10)):
-            
-            #This uri provides access to the actual resource ( i.e., images)
-            request_uri = "https://api.helioviewer.org/v2/getJP2Image/?date=" + final_date + f"&sourceId={source}"
-            hmidata = requests.get(request_uri)
-            open(file_loc_with_name,'wb').write(hmidata.content)
-    #         print(final_date, '-->Downloaded')
-            lis.append([dt, recieved])
+        date_received_str = url_temp.rsplit('__', 1)[0][:-4]
+        received = datetime.datetime.strptime(date_received_str, "%Y_%m_%d__%H_%M_%S")
+
+        print(f"Requested date: {dt}", f"Response data: {received}")
+        Path(f'{basedir}/{dt.year}/{dt.month:02d}/{dt.day:02d}/').mkdir(parents=True, exist_ok=True)
+
+        # Check if the received image is within the desired time window
+        if abs(received - dt) <= datetime.timedelta(minutes=search_space):
+            # Second request: Actually download the image (no jpip)
+            img_response = requests.get(base_url, params={"date": final_date, "sourceId": source})
+            with open(file_loc_with_name, 'wb') as f:
+                f.write(img_response.content)
+
+            lis.append([dt, received])
             counter += 1
             if counter % 2500 == 0:
-                print(counter, 'Files Downloaded')
+                print(f"{counter} Files Downloaded")
+
+        # go to next timestamp
+        dt = dt+ delta
 
     #Total Files Downloaded
     print('Total Files Downloaded: ', counter)
+
+def image_resize(filepath:str, width, height):
+    image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
+    image = cv2.resize(image, (width, height), interpolation = cv2.INTER_AREA)
+    return image
 
 def jp2_to_jpg_conversion(source = '/data/hmi_compressd/', destination = '/data/hmi_jpgs/', file_prefix = "HMI-mig", resize=False, width=512, height=512):
     """
@@ -83,39 +101,88 @@ def jp2_to_jpg_conversion(source = '/data/hmi_compressd/', destination = '/data/
     4) width: image resize width
     5) height: image resize height
     """
-    filename = f'totalfiles_{file_prefix}.csv'
-    with open(filename,'w', newline='', encoding='utf-8-sig') as f:
-        w = csv.writer(f)
-        for path, subdirs, files in os.walk(source):
-            for name in files:
-                w.writerow([os.path.join(path, name), os.path.getsize(os.path.join(path, name))])
-    colnames=['path', 'size'] 
-    df = pd.read_csv(filename, header=None, names=colnames)
-    df['timestamp'] = df['path'].str.rsplit("/", n=2, expand=True).iloc[:, -1].str[len(file_prefix) + 1 : -4]
-    lis=  []
-    for i in range(len(df)):
-        dt = datetime.datetime.strptime(df['timestamp'][i], '%Y.%m.%d_%H.%M.%S')
-        Path(f'{destination}/{dt.year}/{dt.month:02d}/{dt.day:02d}').mkdir(parents=True, exist_ok=True)
-        #Defining name of downloaded images based on the date and time
-        filename = file_prefix + '.' + str(dt.year) + '.' +  f'{dt.month:02d}' + '.' + f'{dt.day:02d}' + '_'\
-            + f'{dt.hour:02d}' + '.' + f'{dt.minute:02d}' + '.' + f'{dt.second:02d}' + '.jpg'
-        file_loc_with_name = f'{destination}/{dt.year}/{dt.month:02d}/{dt.day:02d}/' + filename
+
+    files = glob.glob(source + f"*/*/*/*.jp2")
+    files = sorted(files)
+    for i, file in enumerate(files):
+
+        year, month, day, f_n = file.split("/")[6:]
+        file_name = f_n[:-3] + "jpg"
+        full_path = os.path.join(destination, year, month, day, file_name)
+
+        if os.path.exists(full_path):
+            print(file, "already exists. Passed!")
+            continue
+
         try:
-            image = cv2.imread(str(df.path[i]), cv2.IMREAD_UNCHANGED)
-            if resize:
-                image = cv2.resize(image, (width, height), interpolation = cv2.INTER_AREA)
-            cv2.imwrite(file_loc_with_name, image)
-            print(i, df.timestamp[i], 'Converted')
+            Path(f'{destination}/{year}/{month}/{day}/').mkdir(parents=True, exist_ok=True)
+            image = image_resize(file, width=width, height=height)
+            cv2.imwrite(full_path, image)
+            print(i, full_path, 'Converted')
         except:
-            print('Error Occured!')
-            lis.append([df['path'][i]])
+            print(i, full_path, 'Error Occured!')
             pass
 
+def convert_jp2_to_jpg(file:str, destination:str, width:int, height:int):
+    try:
+        parts = Path(file).parts
+        year, month, day, f_n = parts[-4:]
+        file_name = f_n[:-3] + "jpg"
+        full_path = Path(destination) / year / month / day / file_name
+
+        if full_path.exists():
+            print(file, "already exists. Passed!")
+            return
+
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        image = image_resize(file, width=width, height=height)
+        cv2.imwrite(str(full_path), image)
+        print(full_path, 'Converted')
+
+    except Exception as e:
+        print(file, 'Error Occurred!', e)
+
 if __name__ == '__main__':
-    prefix = 'EUV-304'
-    save_dir = '/workspace/data/hetero_data/euv/304'
-    # download_from_helioviewer(basedir = save_dir, cadence = 60, source = 13, file_prefix = prefix)
-    jp2_to_jpg_conversion(source = save_dir + '/',
-                          file_prefix = prefix, 
-                          destination = '/workspace/data/hetero_data/euv/compressed/304/', 
-                          resize = True, width = 512, height = 512)
+
+    map_source_id = {
+        "94": 8, 
+        "131":9, 
+        "171":10, 
+        "193":11, 
+        "211":12, 
+        "304": 13, 
+        "335":14, 
+        "hmi": 19
+        }
+
+    for channel in ["94", "131", "171", "193", "211", "335"]:
+
+        prefix = f'AIA{channel}'
+        save_dir = f'/workspace/data/hetero_data/euv/{channel}'
+        
+        download_from_helioviewer(
+            basedir = save_dir,
+            start = "2010-12-05 00:00:00",
+            stop = "2024-12-31 12:59:59",
+            cadence = 60, 
+            source = map_source_id[channel], 
+            file_prefix = prefix
+            )
+            
+        files = glob.glob(save_dir + f"/*/*/*/*.jp2")
+        files = sorted(files)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(convert_jp2_to_jpg, file) for file in files]
+
+            for _ in tqdm(as_completed(futures), total=len(files), desc="Converting"):
+                pass
+
+
+        # jp2_to_jpg_conversion(
+        #     source = save_dir + '/',
+        #     file_prefix = prefix, 
+        #     destination = f'/workspace/data/hetero_data/euv/compressed/{channel}/', 
+        #     resize = True, 
+        #     width = 512, 
+        #     height = 512
+        #     )

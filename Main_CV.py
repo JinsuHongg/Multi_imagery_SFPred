@@ -34,14 +34,14 @@ print('2nd process, loading data...')
 # create parser here
 parser = argparse.ArgumentParser(description="FullDiskModelTrainer")
 # parser.add_argument("--fold", type = int, default = 1, help = "Fold Selection")
-parser.add_argument("--epochs", type = int, default = 4, help = "number of epochs")
+parser.add_argument("--epochs", type = int, default = 8, help = "number of epochs")
 parser.add_argument("--batch_size", type = int, default = 64, help = "batch size")
 parser.add_argument("--lr", type = float, default = 1e-6, help = "learning rate")
 parser.add_argument("--weight_decay", type = list, default = [0, 1e-4], help = "regularization parameter")
 parser.add_argument("--max_lr", type = float, default = 1e-2, help = "MAX learning rate")
 parser.add_argument("--models", type = str, default = 'Mobilenet', help = "Enter Mobilenet, Resnet18, Resnet34, Resnet50")
 parser.add_argument("--freeze", type = bool, default = False, help = 'Enter True or False to freeze the convolutional layers')
-parser.add_argument("--data", type = str, default = 'EUV304', help = "Enter Data source: EUV304, HMI-CTnuum, HMI-Mag, All")
+parser.add_argument("--data", type = str, default = 'EUV304', help = "Enter Data source: EUV304, HMI-CTnuum, HMI-Mag, Het")
 opt = parser.parse_args()
 
 
@@ -65,7 +65,7 @@ elif opt.data == "HMI-Mag":
     img_dir = img_dir[channel_tag]
     print("Data Selected: ", opt.data)
     
-elif opt.data == 'All':
+elif opt.data == 'Het':
     # img_dir = img_dir["Magnetogram"]
     channel_tag = 'Het'
     print("Data Selected: ", opt.data)

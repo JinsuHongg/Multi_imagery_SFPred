@@ -1,4 +1,5 @@
 # basic
+import os
 import math
 import time
 import datetime
@@ -38,7 +39,7 @@ parser.add_argument("--lr", type = float, default = 1e-6, help = "learning rate"
 parser.add_argument("--max_lr", type = float, default = 1e-2, help = "MAX learning rate")
 # parser.add_argument("--models", type = str, default = 'Mobilenet', help = "Enter Mobilenet, Resnet18, Resnet34, Resnet50")
 parser.add_argument("--freeze", type = bool, default = False, help = 'Enter True or False to freeze the convolutional layers')
-parser.add_argument("--data", type = str, default = 'EUV304', help = "Enter Data source: EUV304, HMI-CTnuum, HMI-Mag, All")
+parser.add_argument("--data", type = str, default = 'EUV304', help = "Enter Data source: EUV304, HMI-CTnuum, HMI-Mag, Het")
 opt = parser.parse_args()
 
 # optimal weights from Cross-validation
@@ -114,9 +115,11 @@ lr = opt.lr
 max_lr = opt.max_lr
 
 # Define dataset here!
-crr_path = os.get_pwd()
-save_path = crr_path + '/Results/CV/'
-file_path = crr_path + '/Dataset/label/'
+crr_path = os.getcwd()
+save_path = crr_path + '/Multi_imagery_SFPred/Results/CV/'
+file_path = crr_path + '/Multi_imagery_SFPred/Dataset/label/'
+print(f"Data directory: {file_path}")
+print(f"Save directory: {save_path}")
 
 p = [1, 2, 3, 4]
 train_list = [f'24image_multi_GOES_classification_Partition{p[0]}.csv', 
@@ -147,7 +150,7 @@ train_dataloader = DataLoader(data_training, batch_size = batch_size, shuffle = 
 test_dataloader = DataLoader(data_testing, batch_size = batch_size, shuffle = False) # num_workers = 0, pin_memory = True,
 
 # Settings
-models = ['Resnet50']
+models = ['Mobilenet', 'Resnet18', 'Resnet34','Resnet50']
 
 for model_name in models:
     # define model, loss, optimizer and scheduler
